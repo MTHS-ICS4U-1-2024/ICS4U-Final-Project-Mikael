@@ -1,8 +1,10 @@
 #include <3ds.h>
+#include <citro2d.h>
+#include <sfil.h>
 #include <cstdio>
-#include <cstdlib>
 
-// Screen size for console
+// Screen size for rendering
+#define TILE_SIZE 16
 #define SCREEN_WIDTH 50
 #define SCREEN_HEIGHT 20
 
@@ -29,18 +31,24 @@ const char maze[SCREEN_HEIGHT][SCREEN_WIDTH + 1] = {
 // Initialize PacMan
 PacMan pacman = {1, 1, 'R'};
 
+// Textures for the game
+sf2d_texture *pacmanTexture = NULL;
+sf2d_texture *wallTexture = NULL;
+
 // Function to draw the maze and PacMan
 void drawMaze() {
-    consoleClear();
     for (int y = 0; y < SCREEN_HEIGHT; ++y) {
         for (int x = 0; x < SCREEN_WIDTH; ++x) {
+            int drawX = x * TILE_SIZE;
+            int drawY = y * TILE_SIZE;
+
+            // Draw wall or PacMan
             if (x == pacman.x && y == pacman.y) {
-                printf("P");
-            } else {
-                printf("%c", maze[y][x]);
+                sf2d_draw_texture(pacmanTexture, drawX, drawY);
+            } else if (maze[y][x] == '#') {
+                sf2d_draw_texture(wallTexture, drawX, drawY);
             }
         }
-        printf("\n");
     }
 }
 
@@ -66,7 +74,18 @@ void movePacMan() {
 int main() {
     // Initialize services
     gfxInitDefault();
-    consoleInit(GFX_TOP, NULL);
+    consoleInit(GFX_BOTTOM, NULL); // Use bottom screen for text/debugging
+    sf2d_init();
+    romfsInit();
+
+    // Load textures
+    pacmanTexture = sf2d_load_texture_from_file("romfs:/pacman.t3x");
+    wallTexture = sf2d_load_texture_from_file("romfs:/wall.t3x");
+
+    if (!pacmanTexture || !wallTexture) {
+        printf("Failed to load textures.\n");
+        return 1;
+    }
 
     printf("Pac-Man on 3DS\n");
     printf("Press START to exit.\n");
@@ -88,16 +107,20 @@ int main() {
         // Move PacMan
         movePacMan();
 
-        // Draw the maze
+        // Render the screen
+        sf2d_start_frame(GFX_TOP, GFX_LEFT);
         drawMaze();
+        sf2d_end_frame();
 
-        // Wait for the next frame
-        gfxFlushBuffers();
-        gfxSwapBuffers();
-        gspWaitForVBlank();
+        sf2d_swapbuffers();
     }
 
-    // Exit services
+    // Clean up
+    sf2d_free_texture(pacmanTexture);
+    sf2d_free_texture(wallTexture);
+    sf2d_fini();
+    romfsExit();
     gfxExit();
+
     return 0;
 }
